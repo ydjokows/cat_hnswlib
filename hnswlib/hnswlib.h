@@ -30,6 +30,7 @@
 
 namespace hnswlib {
     typedef size_t labeltype;
+    typedef size_t categorytype;
 
     template <typename T>
     class pairGreater {

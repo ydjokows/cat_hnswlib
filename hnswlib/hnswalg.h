@@ -41,9 +41,14 @@ namespace hnswlib {
             level_generator_.seed(random_seed);
 
             size_links_level0_ = maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
-            size_data_per_element_ = size_links_level0_ + data_size_ + sizeof(labeltype);
-            offsetData_ = size_links_level0_;
-            label_offset_ = size_links_level0_ + data_size_;
+            links_level0_ = (char *) malloc(max_elements_ * size_links_level0_);
+            if (links_level0_ == nullptr)
+                throw std::runtime_error("Not enough memory");
+
+            size_data_per_element_ = data_size_ + sizeof(labeltype) + sizeof(categorytype);
+            offsetData_ = 0;
+            label_offset_ = data_size_;
+            category_offset_ = label_offset_ + sizeof(labeltype);
             offsetLevel0_ = 0;
 
             data_level0_memory_ = (char *) malloc(max_elements_ * size_data_per_element_);
@@ -76,7 +81,8 @@ namespace hnswlib {
         };
 
         ~HierarchicalNSW() {
-
+            
+            free(links_level0_);
             free(data_level0_memory_);
             for (tableint i = 0; i < cur_element_count; i++) {
                 if (element_levels_[i] > 0)
@@ -112,6 +118,7 @@ namespace hnswlib {
 
 
         char *data_level0_memory_;
+        char *links_level0_;
         char **linkLists_;
         std::vector<int> element_levels_;
 
@@ -121,11 +128,26 @@ namespace hnswlib {
 
 
         size_t label_offset_;
+        size_t category_offset_;
         DISTFUNC<dist_t> fstdistfunc_;
         void *dist_func_param_;
         std::unordered_map<labeltype, tableint> label_lookup_;
 
         std::default_random_engine level_generator_;
+
+        inline categorytype getCategory(tableint internal_id) const {
+            labeltype return_category;
+            memcpy(&return_category,(data_level0_memory_ + internal_id * size_data_per_element_ + category_offset_), sizeof(categorytype));
+            return return_category;
+        }
+
+        inline void setCategory(tableint internal_id, categorytype category) const {
+            memcpy((data_level0_memory_ + internal_id * size_data_per_element_ + category_offset_), &category, sizeof(categorytype));
+        }
+
+        inline categorytype *getCategoryPtr(tableint internal_id) const {
+            return (categorytype *) (data_level0_memory_ + internal_id * size_data_per_element_ + category_offset_);
+        }
 
         inline labeltype getExternalLabel(tableint internal_id) const {
             labeltype return_label;
@@ -362,11 +384,11 @@ namespace hnswlib {
 
 
         linklistsizeint *get_linklist0(tableint internal_id) const {
-            return (linklistsizeint *) (data_level0_memory_ + internal_id * size_data_per_element_ + offsetLevel0_);
+            return (linklistsizeint *) (links_level0_ + internal_id * size_links_level0_ + offsetLevel0_);
         };
 
         linklistsizeint *get_linklist0(tableint internal_id, char *data_level0_memory_) const {
-            return (linklistsizeint *) (data_level0_memory_ + internal_id * size_data_per_element_ + offsetLevel0_);
+            return (linklistsizeint *) (data_level0_memory_ + internal_id * size_links_level0_ + offsetLevel0_);
         };
 
         linklistsizeint *get_linklist(tableint internal_id, int level) const {
@@ -554,6 +576,15 @@ namespace hnswlib {
             free(data_level0_memory_);
             data_level0_memory_=data_level0_memory_new;
 
+            // Reallocate base links
+            char * links_level0_new = (char *) malloc(new_max_elements * size_links_level0_);
+            if (links_level0_new == nullptr)
+                throw std::runtime_error("Not enough memory: resizeIndex failed to allocate base layer");
+            memcpy(links_level0_new, links_level0_, cur_element_count * size_links_level0_);
+            free(links_level0_);
+            links_level0_=links_level0_new;
+
+
             // Reallocate all other layers
             char ** linkLists_new = (char **) malloc(sizeof(void *) * new_max_elements);
             if (linkLists_new == nullptr)
@@ -574,6 +605,7 @@ namespace hnswlib {
             writeBinaryPOD(output, max_elements_);
             writeBinaryPOD(output, cur_element_count);
             writeBinaryPOD(output, size_data_per_element_);
+            writeBinaryPOD(output, size_links_level0_);
             writeBinaryPOD(output, label_offset_);
             writeBinaryPOD(output, offsetData_);
             writeBinaryPOD(output, maxlevel_);
@@ -586,6 +618,7 @@ namespace hnswlib {
             writeBinaryPOD(output, ef_construction_);
 
             output.write(data_level0_memory_, cur_element_count * size_data_per_element_);
+            output.write(links_level0_, cur_element_count * size_links_level0_);
 
             for (size_t i = 0; i < cur_element_count; i++) {
                 unsigned int linkListSize = element_levels_[i] > 0 ? size_links_per_element_ * element_levels_[i] : 0;
@@ -619,6 +652,7 @@ namespace hnswlib {
                 max_elements = max_elements_;
             max_elements_ = max_elements;
             readBinaryPOD(input, size_data_per_element_);
+            readBinaryPOD(input, size_links_level0_);
             readBinaryPOD(input, label_offset_);
             readBinaryPOD(input, offsetData_);
             readBinaryPOD(input, maxlevel_);
@@ -640,7 +674,7 @@ namespace hnswlib {
             
             /// Optional - check if index is ok:
 
-            input.seekg(cur_element_count * size_data_per_element_,input.cur);
+            input.seekg(cur_element_count * size_data_per_element_ + cur_element_count * size_links_level0_,input.cur);
             for (size_t i = 0; i < cur_element_count; i++) {
                 if(input.tellg() < 0 || input.tellg()>=total_filesize){
                     throw std::runtime_error("Index seems to be corrupted or unsupported");
@@ -669,13 +703,13 @@ namespace hnswlib {
                 throw std::runtime_error("Not enough memory: loadIndex failed to allocate level0");
             input.read(data_level0_memory_, cur_element_count * size_data_per_element_);
 
-            
-
+            links_level0_ = (char *) malloc(max_elements * size_links_level0_);
+            if (links_level0_ == nullptr)
+                throw std::runtime_error("Not enough memory: loadIndex failed to allocate level0");
+            input.read(links_level0_, cur_element_count * size_links_level0_);
 
             size_links_per_element_ = maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
 
-
-            size_links_level0_ = maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
             std::vector<std::mutex>(max_elements).swap(link_list_locks_);
 
 
