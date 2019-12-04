@@ -69,6 +69,10 @@ class RandomSelfTestCase(unittest.TestCase):
         self.assertIn(18, p.get_tags(6015))
         self.assertIn(18, p.get_tags(6015))
 
+        p.set_tags(5, [1,2,3])
+
+        self.assertIn(2, p.get_tags(5))
+        self.assertNotIn(66, p.get_tags(5))
 
         # Query the elements for themselves and measure recall:
         labels, _ = p.knn_query(data, k=1)
