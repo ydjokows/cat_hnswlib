@@ -351,6 +351,19 @@ public:
 
     }
 
+
+    void setTags(size_t label, hnswlib::tagcontainer &tags) {
+        appr_alg->setTagsByLabel(label, tags);
+    }
+
+    void addTags(std::vector<size_t> &lables, size_t tag) {
+        appr_alg->addTags(lables, tag, true);
+    }
+
+    const hnswlib::tagcontainer& getTags(size_t label) {
+        return appr_alg->getTagsByLabel(label);
+    }
+
     void markDeleted(size_t label) {
         appr_alg->markDelete(label);
     }
@@ -406,6 +419,9 @@ PYBIND11_PLUGIN(hnswlib) {
         .def("mark_deleted", &Index<float>::markDeleted, py::arg("label"))
         .def("resize_index", &Index<float>::resizeIndex, py::arg("new_size"))
         .def("get_max_elements", &Index<float>::getMaxElements)
+        .def("set_tags", &Index<float>::setTags,py::arg("label"), py::arg("tags"))
+        .def("add_tags", &Index<float>::addTags, py::arg("labels"), py::arg("tag"))
+        .def("get_tags", &Index<float>::getTags, py::arg("label"))
         .def("get_current_count", &Index<float>::getCurrentCount)
         .def("__repr__",
         [](const Index<float> &a) {

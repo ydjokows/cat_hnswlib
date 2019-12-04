@@ -2,10 +2,12 @@
 
 #include "visited_list_pool.h"
 #include "hnswlib.h"
+#include "node_tags.h"
 #include <random>
 #include <stdlib.h>
 #include <unordered_set>
 #include <list>
+#include <iostream>
 
 
 namespace hnswlib {
@@ -45,7 +47,7 @@ namespace hnswlib {
             if (links_level0_ == nullptr)
                 throw std::runtime_error("Not enough memory");
 
-            size_data_per_element_ = data_size_ + sizeof(labeltype) + sizeof(categorytype);
+            size_data_per_element_ = data_size_ + sizeof(labeltype);
             offsetData_ = 0;
             label_offset_ = data_size_;
             category_offset_ = label_offset_ + sizeof(labeltype);
@@ -59,7 +61,7 @@ namespace hnswlib {
 
             visited_list_pool_ = new VisitedListPool(1, max_elements);
 
-
+            tags.resize(max_elements_);
 
             //initializations for special treatment of the first node
             enterpoint_node_ = -1;
@@ -135,19 +137,7 @@ namespace hnswlib {
 
         std::default_random_engine level_generator_;
 
-        inline categorytype getCategory(tableint internal_id) const {
-            labeltype return_category;
-            memcpy(&return_category,(data_level0_memory_ + internal_id * size_data_per_element_ + category_offset_), sizeof(categorytype));
-            return return_category;
-        }
-
-        inline void setCategory(tableint internal_id, categorytype category) const {
-            memcpy((data_level0_memory_ + internal_id * size_data_per_element_ + category_offset_), &category, sizeof(categorytype));
-        }
-
-        inline categorytype *getCategoryPtr(tableint internal_id) const {
-            return (categorytype *) (data_level0_memory_ + internal_id * size_data_per_element_ + category_offset_);
-        }
+        TagsStore tags;
 
         inline labeltype getExternalLabel(tableint internal_id) const {
             labeltype return_label;
@@ -619,6 +609,8 @@ namespace hnswlib {
 
             output.write(data_level0_memory_, cur_element_count * size_data_per_element_);
             output.write(links_level0_, cur_element_count * size_links_level0_);
+            
+            tags.serialize(out);
 
             for (size_t i = 0; i < cur_element_count; i++) {
                 unsigned int linkListSize = element_levels_[i] > 0 ? size_links_per_element_ * element_levels_[i] : 0;
@@ -737,7 +729,11 @@ namespace hnswlib {
                         throw std::runtime_error("Not enough memory: loadIndex failed to allocate linklist");
                     input.read(linkLists_[i], linkListSize);
                 }
-            }
+            }  
+
+            tags.reset()
+            tags.resize(max_elements_)
+            tags.deserialize(in);
 
             has_deletions_=false;
 
@@ -770,6 +766,78 @@ namespace hnswlib {
                 data_ptr += 1;
             }
             return data;
+        }
+
+        inline tableint getInterenalIdByLabel(labeltype label)
+        {
+            auto search = label_lookup_.find(label);
+            if (search == label_lookup_.end()) {
+                throw std::runtime_error("Label not found");
+            }
+            return search->second;
+        }
+
+        void setTagsByLabel(labeltype label, hnswlib::tagcontainer &new_element_tags) {
+            tags.setTags(getInterenalIdByLabel(label), new_element_tags);
+        }
+
+        /**
+         * Assigns tag to the datapoint
+         * @param label
+         * @param tag
+         */
+        void addTagByLabel(labeltype label, tagtype tag)
+        {   
+            tags.addTag(getInterenalIdByLabel(label), tag);
+        }
+
+        /**
+         * Returns assigned category
+         * @param label
+         */
+        const tagcontainer &getTagsByLabel(labeltype label)
+        {
+            return tags.getTags(getInterenalIdByLabel(label));
+        }
+
+        /**
+         * Bulk assign categories to datapoints. 
+         * @param lables
+         * @param tag
+         * @param index do additional indexing inside category?
+         */
+        void addTags(std::vector<labeltype> &lables, const tagtype tag, const bool index = false)
+        {
+            std::vector<tableint> ids = std::vector<tableint>();
+            for (labeltype label : lables) {
+                tableint point_id = getInterenalIdByLabel(label);
+                ids.push_back(point_id);
+                tags.addTag(point_id, tag);
+            }
+
+            if (index) {
+                additinalIndex(ids);
+            }
+        }
+
+        /**
+         * Perform additional indexing over subset of points
+         * 
+         */
+        void additinalIndex(std::vector<tableint> &ids)
+        {
+            std::cout << "additinalIndex " << ids.size() << std::endl;
+        }
+
+        /**
+         * Perform additional indexing over subset of points
+         * 
+         */
+        void additinalIndexByLables(std::vector<labeltype> &labels)
+        {
+            std::vector<tableint> ids = std::vector<tableint>();
+            std::transform(labels.begin(), labels.end(), std::back_inserter(ids), getInterenalIdByLabel);
+            additinalIndex(ids);
         }
 
         static const unsigned char DELETE_MARK = 0x01;
