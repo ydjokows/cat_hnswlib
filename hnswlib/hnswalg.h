@@ -11,7 +11,6 @@
 
 
 namespace hnswlib {
-    typedef unsigned int tableint;
     typedef unsigned int linklistsizeint;
 
     template<typename dist_t>
@@ -607,10 +606,10 @@ namespace hnswlib {
             writeBinaryPOD(output, mult_);
             writeBinaryPOD(output, ef_construction_);
 
+            tags.serialize(output);
+
             output.write(data_level0_memory_, cur_element_count * size_data_per_element_);
             output.write(links_level0_, cur_element_count * size_links_level0_);
-            
-            tags.serialize(out);
 
             for (size_t i = 0; i < cur_element_count; i++) {
                 unsigned int linkListSize = element_levels_[i] > 0 ? size_links_per_element_ * element_levels_[i] : 0;
@@ -656,6 +655,9 @@ namespace hnswlib {
             readBinaryPOD(input, mult_);
             readBinaryPOD(input, ef_construction_);
 
+            tags.reset();
+            tags.resize(max_elements_);
+            tags.deserialize(input);
 
             data_size_ = s->get_data_size();
             fstdistfunc_ = s->get_dist_func();
@@ -731,10 +733,6 @@ namespace hnswlib {
                 }
             }  
 
-            tags.reset()
-            tags.resize(max_elements_)
-            tags.deserialize(in);
-
             has_deletions_=false;
 
             for (size_t i = 0; i < cur_element_count; i++) {
@@ -795,7 +793,7 @@ namespace hnswlib {
          * Returns assigned category
          * @param label
          */
-        const tagcontainer &getTagsByLabel(labeltype label)
+        const tagcontainer getTagsByLabel(labeltype label)
         {
             return tags.getTags(getInterenalIdByLabel(label));
         }

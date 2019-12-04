@@ -6,6 +6,7 @@
 #include <vector>
 #include <set>
 
+using namespace hnswlib;
 
 namespace hnswlib {
     typedef std::set<tagtype> tagcontainer;
@@ -35,10 +36,10 @@ namespace hnswlib {
 
         void serialize(std::ostream &out) {
             for(size_t i = 0; i < _max_elements; i++) {
-                auto element_tags = tags[i];
-                size_t length = element_tags.size();
+                auto *element_tags = &tags[i];
+                size_t length = element_tags->size();
                 writeBinaryPOD(out, length);
-                for(const tagtype &tag : element_tags) {
+                for(const tagtype &tag : *element_tags) {
                     writeBinaryPOD(out, tag);
                 }
             }
@@ -46,30 +47,32 @@ namespace hnswlib {
 
         void deserialize(std::istream &in) {
             for(size_t i = 0; i < _max_elements; i++) {
-                auto element_tags = tags[i];
+                auto *element_tags = &tags[i];
                 size_t length = 0;
                 readBinaryPOD(in, length);
                 for(size_t j = 0; j < length; j++) {
                     tagtype tag = 0;
                     readBinaryPOD(in, tag);
-                    element_tags.insert(element_tags.end(), tag);
+                    element_tags->insert(element_tags->end(), tag);
                 }
             }
         }
 
-        const tagcontainer &getTags(tableint id) {
-            return tags[id];
+        tagcontainer getTags(tableint idx) {
+            return tags[idx];
         }
 
         void addTag(tableint id, tagtype tag) {
-            tagcontainer element_tags = tags[id];
-            element_tags.insert(element_tags.end(), tag);
+            tagcontainer *element_tags = &tags[id];
+            element_tags->insert(element_tags->end(), tag);
         }
 
         void setTags(tableint id, tagcontainer &new_element_tags) {
-            tagcontainer element_tags = tags[id];
-            element_tags.clear();
-            copy(new_element_tags.begin(), new_element_tags.end(), back_inserter(element_tags)); 
+            tagcontainer *element_tags = &tags[id];
+            element_tags->clear();
+            for(auto &tag: new_element_tags) {
+                element_tags->insert(element_tags->end(), tag);
+            }
         }
     };
 }

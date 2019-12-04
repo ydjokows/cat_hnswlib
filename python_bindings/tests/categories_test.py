@@ -38,7 +38,8 @@ class RandomSelfTestCase(unittest.TestCase):
         print("Adding first batch of %d elements" % (len(data1)))
         p.add_items(data1)
 
-        p.set_categories([1, 5, 100, 33], 8)
+        p.add_tags([1, 5, 100, 33], 8)
+        p.add_tags([2, 5, 66, 17], 66)
 
         # Query the elements for themselves and measure recall:
         labels, _ = p.knn_query(data1, k=1)
@@ -56,10 +57,18 @@ class RandomSelfTestCase(unittest.TestCase):
         print("\nLoading index from 'first_half.bin'\n")
         p.load_index("first_half.bin")
 
-        self.assertEqual(p.get_category(5), 8)
+        self.assertIn(8, p.get_tags(5))
+        self.assertIn(66, p.get_tags(5))
 
         print("Adding the second batch of %d elements" % (len(data2)))
         p.add_items(data2)
+
+        p.add_tags([1011, 6015], 18)
+        p.add_tags([7819], 22)
+
+        self.assertIn(18, p.get_tags(6015))
+        self.assertIn(18, p.get_tags(6015))
+
 
         # Query the elements for themselves and measure recall:
         labels, _ = p.knn_query(data, k=1)

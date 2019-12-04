@@ -360,7 +360,7 @@ public:
         appr_alg->addTags(lables, tag, true);
     }
 
-    const hnswlib::tagcontainer& getTags(size_t label) {
+    const hnswlib::tagcontainer getTags(size_t label) {
         return appr_alg->getTagsByLabel(label);
     }
 

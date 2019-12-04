@@ -29,6 +29,7 @@
 #include <string.h>
 
 namespace hnswlib {
+    typedef unsigned int tableint;
     typedef size_t labeltype;
     typedef size_t tagtype;
 
