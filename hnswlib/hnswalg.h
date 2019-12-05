@@ -9,6 +9,8 @@
 #include <list>
 #include <iostream>
 
+#include <fstream>
+
 
 namespace hnswlib {
     typedef unsigned int linklistsizeint;
@@ -36,6 +38,10 @@ namespace hnswlib {
             M_ = M;
             maxM_ = M_;
             maxM0_ = M_ * 2;
+            
+            maxSearchM_ = maxM_;
+            maxSearchM0_ = maxM0_ * 2;
+
             ef_construction_ = std::max(ef_construction,M_);
             ef_ = 10;
 
@@ -101,6 +107,10 @@ namespace hnswlib {
         size_t M_;
         size_t maxM_;
         size_t maxM0_;
+
+        size_t maxSearchM_;
+        size_t maxSearchM0_;
+
         size_t ef_construction_;
 
         double mult_, revSize_;
@@ -246,7 +256,7 @@ namespace hnswlib {
 
         template <bool has_deletions>
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst>
-        searchBaseLayerST(tableint ep_id, const void *data_point, size_t ef) const {
+        searchBaseLayerST(tableint ep_id, const void *data_point, size_t ef, const SearchCondition& condition) const {
             VisitedList *vl = visited_list_pool_->getFreeVisitedList();
             vl_type *visited_array = vl->mass;
             vl_type visited_array_tag = vl->curV;
@@ -276,6 +286,8 @@ namespace hnswlib {
                 }
                 candidate_set.pop();
 
+                size_t num_checked = 0;
+
                 tableint current_node_id = current_node_pair.second;
                 int *data = (int *) get_linklist0(current_node_id);
                 size_t size = getListCount((linklistsizeint*)data);
@@ -289,7 +301,14 @@ namespace hnswlib {
 #endif
 
                 for (size_t j = 1; j <= size; j++) {
+                    if (num_checked > maxSearchM0_) {
+                        break;
+                    }
                     int candidate_id = *(data + j);
+                    if(!tags.checkCondition(candidate_id, condition)) {
+                        continue;
+                    }
+                    num_checked += 1;
 //                    if (candidate_id == 0) continue;
 #ifdef USE_SSE
                     _mm_prefetch((char *) (visited_array + *(data + j + 1)), _MM_HINT_T0);
@@ -495,53 +514,6 @@ namespace hnswlib {
             ef_ = ef;
         }
 
-
-        std::priority_queue<std::pair<dist_t, tableint>> searchKnnInternal(void *query_data, int k) {
-            std::priority_queue<std::pair<dist_t, tableint  >> top_candidates;
-            if (cur_element_count == 0) return top_candidates;
-            tableint currObj = enterpoint_node_;
-            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
-
-            for (size_t level = maxlevel_; level > 0; level--) {
-                bool changed = true;
-                while (changed) {
-                    changed = false;
-                    int *data;
-                    data = (int *) get_linklist(currObj,level);
-                    int size = getListCount(data);
-                    tableint *datal = (tableint *) (data + 1);
-                    for (int i = 0; i < size; i++) {
-                        tableint cand = datal[i];
-                        if (cand < 0 || cand > max_elements_)
-                            throw std::runtime_error("cand error");
-                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
-
-                        if (d < curdist) {
-                            curdist = d;
-                            currObj = cand;
-                            changed = true;
-                        }
-                    }
-                }
-            }
-
-            if (has_deletions_) {
-                std::priority_queue<std::pair<dist_t, tableint  >> top_candidates1=searchBaseLayerST<true>(currObj, query_data,
-                                                                                                             ef_);
-                top_candidates.swap(top_candidates1);
-            }
-            else{
-                std::priority_queue<std::pair<dist_t, tableint  >> top_candidates1=searchBaseLayerST<false>(currObj, query_data,
-                                                                                                              ef_);
-                top_candidates.swap(top_candidates1);
-            }
-            
-            while (top_candidates.size() > k) {
-                top_candidates.pop();
-            }
-            return top_candidates;
-        };
-
         void resizeIndex(size_t new_max_elements){
             if (new_max_elements<cur_element_count)
                 throw std::runtime_error("Cannot resize, max element is less than the current number of elements");
@@ -603,6 +575,8 @@ namespace hnswlib {
 
             writeBinaryPOD(output, maxM0_);
             writeBinaryPOD(output, M_);
+            // writeBinaryPOD(output, maxSearchM_);
+            // writeBinaryPOD(output, maxSearchM0_);
             writeBinaryPOD(output, mult_);
             writeBinaryPOD(output, ef_construction_);
 
@@ -652,6 +626,8 @@ namespace hnswlib {
             readBinaryPOD(input, maxM_);
             readBinaryPOD(input, maxM0_);
             readBinaryPOD(input, M_);
+            // readBinaryPOD(input, maxSearchM_);
+            // readBinaryPOD(input, maxSearchM0_);
             readBinaryPOD(input, mult_);
             readBinaryPOD(input, ef_construction_);
 
@@ -748,13 +724,8 @@ namespace hnswlib {
         template<typename data_t>
         std::vector<data_t> getDataByLabel(labeltype label)
         {
-            tableint label_c;
-            auto search = label_lookup_.find(label);
-            if (search == label_lookup_.end() || isMarkedDeleted(search->second)) {
-                throw std::runtime_error("Label not found");
-            }
-            label_c = search->second;
-
+            tableint label_c = getInterenalIdByLabel(label);
+           
             char* data_ptrv = getDataByInternalId(label_c);
             size_t dim = *((size_t *) dist_func_param_);
             std::vector<data_t> data;
@@ -1011,7 +982,7 @@ namespace hnswlib {
         };
 
         std::priority_queue<std::pair<dist_t, labeltype >>
-        searchKnn(const void *query_data, size_t k) const {
+        searchKnn(const void *query_data, size_t k, SearchCondition &condition) const {
             std::priority_queue<std::pair<dist_t, labeltype >> result;
             if (cur_element_count == 0) return result;
 
@@ -1023,16 +994,22 @@ namespace hnswlib {
                 while (changed) {
                     changed = false;
                     unsigned int *data;
-
+                    size_t num_checked = 0;
                     data = (unsigned int *) get_linklist(currObj, level);
                     int size = getListCount(data);
                     tableint *datal = (tableint *) (data + 1);
                     for (int i = 0; i < size; i++) {
+                        if (num_checked > maxSearchM_) {
+                            break;
+                        }
                         tableint cand = datal[i];
+                        if(!tags.checkCondition(cand, condition)) {
+                            continue;
+                        }
                         if (cand < 0 || cand > max_elements_)
                             throw std::runtime_error("cand error");
                         dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
-
+                        num_checked += 1;
                         if (d < curdist) {
                             curdist = d;
                             currObj = cand;
@@ -1045,12 +1022,12 @@ namespace hnswlib {
             std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates;
             if (has_deletions_) {
                 std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates1=searchBaseLayerST<true>(
-                        currObj, query_data, std::max(ef_, k));
+                        currObj, query_data, std::max(ef_, k), condition);
                 top_candidates.swap(top_candidates1);
             }
             else{
                 std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates1=searchBaseLayerST<false>(
-                        currObj, query_data, std::max(ef_, k));
+                        currObj, query_data, std::max(ef_, k), condition);
                 top_candidates.swap(top_candidates1);
             }
             while (top_candidates.size() > k) {
@@ -1063,25 +1040,6 @@ namespace hnswlib {
             }
             return result;
         };
-
-        template <typename Comp>
-        std::vector<std::pair<dist_t, labeltype>>
-        searchKnn(const void* query_data, size_t k, Comp comp) {
-            std::vector<std::pair<dist_t, labeltype>> result;
-            if (cur_element_count == 0) return result;
-
-            auto ret = searchKnn(query_data, k);
-
-            while (!ret.empty()) {
-                result.push_back(ret.top());
-                ret.pop();
-            }
-
-            std::sort(result.begin(), result.end(), comp);
-
-            return result;
-        }
-
     };
 
 }

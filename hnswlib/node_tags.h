@@ -1,15 +1,13 @@
 #pragma once
 
-#include "hnswlib.h"
+#include "types.h"
+#include "condition.h"
 #include <mutex>
 #include <string.h>
 #include <vector>
 #include <set>
 
-using namespace hnswlib;
-
 namespace hnswlib {
-    typedef std::set<tagtype> tagcontainer;
 
     class TagsStore {
     public:
@@ -73,6 +71,10 @@ namespace hnswlib {
             for(auto &tag: new_element_tags) {
                 element_tags->insert(element_tags->end(), tag);
             }
+        }
+
+        bool checkCondition(tableint id, const SearchCondition &condition) const {
+            return condition.checkCondition(tags[id]);
         }
     };
 }

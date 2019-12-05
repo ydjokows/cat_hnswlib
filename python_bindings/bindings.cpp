@@ -254,13 +254,15 @@ public:
         return ids;
     }
 
-    py::object knnQuery_return_numpy(py::object input, size_t k = 1, int num_threads = -1) {
+    py::object knnQuery_return_numpy(py::object input, size_t k = 1, int num_threads = -1, hnswlib::condition_t &conditions = {}) {
 
         py::array_t < dist_t, py::array::c_style | py::array::forcecast > items(input);
         auto buffer = items.request();
         hnswlib::labeltype *data_numpy_l;
         dist_t *data_numpy_d;
         size_t rows, features;
+
+        hnswlib::SearchCondition search_condition = hnswlib::SearchCondition(conditions);
 
         if (num_threads <= 0)
             num_threads = num_threads_default;
@@ -291,7 +293,7 @@ public:
             if(normalize==false) {
                 ParallelFor(0, rows, num_threads, [&](size_t row, size_t threadId) {
                                 std::priority_queue<std::pair<dist_t, hnswlib::labeltype >> result = appr_alg->searchKnn(
-                                        (void *) items.data(row), k);
+                                        (void *) items.data(row), k, search_condition);
                                 if (result.size() != k)
                                     throw std::runtime_error(
                                             "Cannot return the results in a contigious 2D array. Probably ef or M is to small");
@@ -313,7 +315,7 @@ public:
 								normalize_vector((float *) items.data(row), (norm_array.data()+start_idx));
 
                                 std::priority_queue<std::pair<dist_t, hnswlib::labeltype >> result = appr_alg->searchKnn(
-                                        (void *) (norm_array.data()+start_idx), k);
+                                        (void *) (norm_array.data()+start_idx), k, search_condition);
                                 if (result.size() != k)
                                     throw std::runtime_error(
                                             "Cannot return the results in a contigious 2D array. Probably ef or M is to small");
@@ -406,7 +408,7 @@ PYBIND11_PLUGIN(hnswlib) {
         .def(py::init<const std::string &, const int>(), py::arg("space"), py::arg("dim"))
         .def("init_index", &Index<float>::init_new_index, py::arg("max_elements"), py::arg("M")=16,
         py::arg("ef_construction")=200, py::arg("random_seed")=100)
-        .def("knn_query", &Index<float>::knnQuery_return_numpy, py::arg("data"), py::arg("k")=1, py::arg("num_threads")=-1)
+        .def("knn_query", &Index<float>::knnQuery_return_numpy, py::arg("data"), py::arg("k")=1, py::arg("num_threads")=-1, py::arg("conditions")=std::vector<std::set< hnswlib::tagtype >>())
         .def("add_items", &Index<float>::addItems, py::arg("data"), py::arg("ids") = py::none(), py::arg("num_threads")=-1)
         .def("get_items", &Index<float, float>::getDataReturnList, py::arg("ids") = py::none())
         .def("get_ids_list", &Index<float>::getIdsList)

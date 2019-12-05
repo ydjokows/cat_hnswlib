@@ -23,16 +23,19 @@
 #endif
 #endif
 
+#include "types.h"
+#include "condition.h"
 #include <queue>
 #include <vector>
-
+#include <set>
+#include <unordered_map>
+#include <fstream>
+#include <mutex>
+#include <algorithm>
 #include <string.h>
 
 namespace hnswlib {
-    typedef unsigned int tableint;
-    typedef size_t labeltype;
-    typedef size_t tagtype;
-
+    
     template <typename T>
     class pairGreater {
     public:
@@ -72,10 +75,7 @@ namespace hnswlib {
     class AlgorithmInterface {
     public:
         virtual void addPoint(const void *datapoint, labeltype label)=0;
-        virtual std::priority_queue<std::pair<dist_t, labeltype >> searchKnn(const void *, size_t) const = 0;
-        template <typename Comp>
-        std::vector<std::pair<dist_t, labeltype>> searchKnn(const void*, size_t, Comp) {
-        }
+        virtual std::priority_queue<std::pair<dist_t, labeltype >> searchKnn(const void *, size_t, SearchCondition&) const = 0;
         virtual void saveIndex(const std::string &location)=0;
         virtual ~AlgorithmInterface(){
         }
@@ -86,5 +86,4 @@ namespace hnswlib {
 
 #include "space_l2.h"
 #include "space_ip.h"
-#include "bruteforce.h"
 #include "hnswalg.h"
