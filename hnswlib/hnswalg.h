@@ -49,10 +49,7 @@ namespace hnswlib {
             level_generator_.seed(random_seed);
 
             size_data_per_element_ = data_size_ + sizeof(labeltype);
-            offsetData_ = 0;
             label_offset_ = data_size_;
-            category_offset_ = label_offset_ + sizeof(labeltype);
-            offsetLevel0_ = 0;
 
             data_level0_memory_ = (char *) malloc(max_elements_ * size_data_per_element_);
             if (data_level0_memory_ == nullptr)
@@ -70,8 +67,6 @@ namespace hnswlib {
             enterpoint_node_ = -1;
             maxlevel_ = -1;
 
-            size_links_per_element_ = maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
-            
             mult_ = 1 / log(1.0 * M_);
             revSize_ = 1.0 / mult_;
             
@@ -91,13 +86,12 @@ namespace hnswlib {
         }
 
         GraphLayer0 layer0;
-
         GraphLayers layers;
+        TagsStore tags;
 
         size_t max_elements_;
         size_t cur_element_count;
         size_t size_data_per_element_;
-        size_t size_links_per_element_;
 
         size_t M_;
         size_t maxM_;
@@ -118,11 +112,6 @@ namespace hnswlib {
         std::vector<std::mutex> link_list_locks_;
         tableint enterpoint_node_;
 
-
-        size_t size_links_level0_;
-        size_t offsetData_, offsetLevel0_;
-
-
         char *data_level0_memory_;
 
         size_t data_size_;
@@ -131,14 +120,13 @@ namespace hnswlib {
 
 
         size_t label_offset_;
-        size_t category_offset_;
         DISTFUNC<dist_t> fstdistfunc_;
         void *dist_func_param_;
         std::unordered_map<labeltype, tableint> label_lookup_;
 
         std::default_random_engine level_generator_;
 
-        TagsStore tags;
+
 
         inline labeltype getExternalLabel(tableint internal_id) const {
             labeltype return_label;
@@ -155,7 +143,7 @@ namespace hnswlib {
         }
 
         inline char *getDataByInternalId(tableint internal_id) const {
-            return (data_level0_memory_ + internal_id * size_data_per_element_ + offsetData_);
+            return (data_level0_memory_ + internal_id * size_data_per_element_);
         }
 
         size_t getRandomLevel(double reverse_size) {
@@ -290,7 +278,7 @@ namespace hnswlib {
                 if (size > 1) {
                     _mm_prefetch((char *) (visited_array + data->at(0)), _MM_HINT_T0);
                     _mm_prefetch((char *) (visited_array + data->at(0) + 64), _MM_HINT_T0);
-                    _mm_prefetch(data_level0_memory_ + data->at(0) * size_data_per_element_ + offsetData_, _MM_HINT_T0);
+                    _mm_prefetch(data_level0_memory_ + data->at(0) * size_data_per_element_, _MM_HINT_T0);
                     _mm_prefetch((char *) &(data->at(1)), _MM_HINT_T0);
                 }
 #endif
@@ -308,7 +296,7 @@ namespace hnswlib {
 #ifdef USE_SSE
                     if (size > j + 1) {
                         _mm_prefetch((char *) (visited_array + data->at(j + 1)), _MM_HINT_T0);
-                        _mm_prefetch(data_level0_memory_ + data->at(j + 1) * size_data_per_element_ + offsetData_,
+                        _mm_prefetch(data_level0_memory_ + data->at(j + 1) * size_data_per_element_,
                                     _MM_HINT_T0);////////////
                     }
 #endif
@@ -322,8 +310,7 @@ namespace hnswlib {
                         if (top_candidates.size() < ef || lowerBound > dist) {
                             candidate_set.emplace(-dist, candidate_id);
 #ifdef USE_SSE
-                            _mm_prefetch(data_level0_memory_ + candidate_set.top().second * size_data_per_element_ +
-                                         offsetLevel0_,///////////
+                            _mm_prefetch(data_level0_memory_ + candidate_set.top().second * size_data_per_element_,///////////
                                          _MM_HINT_T0);////////////////////////
 #endif
 
@@ -526,13 +513,10 @@ namespace hnswlib {
             std::ofstream output(location, std::ios::binary);
             std::streampos position;
 
-            writeBinaryPOD(output, offsetLevel0_);
             writeBinaryPOD(output, max_elements_);
             writeBinaryPOD(output, cur_element_count);
             writeBinaryPOD(output, size_data_per_element_);
-            writeBinaryPOD(output, size_links_level0_);
             writeBinaryPOD(output, label_offset_);
-            writeBinaryPOD(output, offsetData_);
             writeBinaryPOD(output, maxlevel_);
             writeBinaryPOD(output, enterpoint_node_);
             writeBinaryPOD(output, maxM_);
@@ -568,7 +552,6 @@ namespace hnswlib {
             std::streampos total_filesize=input.tellg();
             input.seekg(0,input.beg);
 
-            readBinaryPOD(input, offsetLevel0_);
             readBinaryPOD(input, max_elements_);
             readBinaryPOD(input, cur_element_count);
 
@@ -577,9 +560,7 @@ namespace hnswlib {
                 max_elements = max_elements_;
             max_elements_ = max_elements;
             readBinaryPOD(input, size_data_per_element_);
-            readBinaryPOD(input, size_links_level0_);
             readBinaryPOD(input, label_offset_);
-            readBinaryPOD(input, offsetData_);
             readBinaryPOD(input, maxlevel_);
             readBinaryPOD(input, enterpoint_node_);
 
@@ -809,7 +790,7 @@ namespace hnswlib {
             tableint enterpoint_copy = enterpoint_node_;
 
 
-            memset(data_level0_memory_ + cur_c * size_data_per_element_ + offsetLevel0_, 0, size_data_per_element_);
+            memset(data_level0_memory_ + cur_c * size_data_per_element_, 0, size_data_per_element_);
 
             // Initialisation of the data and label
             memcpy(getExternalLabeLp(cur_c), &label, sizeof(labeltype));
