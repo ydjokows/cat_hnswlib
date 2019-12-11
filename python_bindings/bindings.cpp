@@ -363,7 +363,7 @@ public:
     }
 
     const hnswlib::tagcontainer getTags(size_t label) {
-        return appr_alg->getTagsByLabel(label);
+        return *appr_alg->getTagsByLabel(label);
     }
 
     void markDeleted(size_t label) {
