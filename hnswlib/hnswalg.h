@@ -186,9 +186,9 @@ namespace hnswlib {
 
                 linkcontainer *data;
                 if (layer == 0) {
-                    data = get_linklist0(curNodeNum);
+                    data = layer0.getData(curNodeNum);
                 } else {
-                    data = get_linklist(curNodeNum, layer);
+                    data = layers.getLinks(curNodeNum, layer);
                 }
                 size_t size = data->size();
 #ifdef USE_SSE
@@ -270,7 +270,7 @@ namespace hnswlib {
                 size_t num_checked = 0;
 
                 tableint current_node_id = current_node_pair.second;
-                const linkcontainer *data = get_linklist0(current_node_id);
+                const linkcontainer *data = layer0.getData(current_node_id);
                 size_t size = data->size();
 //                bool cur_node_deleted = isMarkedDeleted(current_node_id);
 
@@ -374,22 +374,6 @@ namespace hnswlib {
             }
         }
 
-        linkcontainer *get_linklist0(tableint internal_id) {
-            return layer0.getData(internal_id);
-        };
-
-        linkcontainer *get_linklist(tableint internal_id, size_t level) {
-            return layers.getLinks(internal_id, level);
-        };
-
-        const linkcontainer *get_linklist0(tableint internal_id) const {
-            return layer0.getData(internal_id);
-        };
-
-        const linkcontainer *get_linklist(tableint internal_id, size_t level) const {
-            return layers.getLinks(internal_id, level);
-        };
-
         size_t get_node_level(tableint internal_id) {
             return layers.getData(internal_id)->size();
         }
@@ -412,9 +396,9 @@ namespace hnswlib {
             {
                 linkcontainer *ll_cur;
                 if (level == 0)
-                    ll_cur = get_linklist0(cur_c);
+                    ll_cur = layer0.getData(cur_c);
                 else
-                    ll_cur = get_linklist(cur_c, level);
+                    ll_cur = layers.getLinks(cur_c, level);
 
                 if (!ll_cur->empty()) {
                     throw std::runtime_error("The newly inserted element should have blank link list");
@@ -434,9 +418,9 @@ namespace hnswlib {
 
                 linkcontainer *ll_other;
                 if (level == 0)
-                    ll_other = get_linklist0(selectedNeighbors[idx]);
+                    ll_other = layer0.getData(selectedNeighbors[idx]);
                 else
-                    ll_other = get_linklist(selectedNeighbors[idx], level);
+                    ll_other = layers.getLinks(selectedNeighbors[idx], level);
 
                 size_t sz_link_list_other = ll_other->size();
 
@@ -749,15 +733,15 @@ namespace hnswlib {
             return false; // ToDo: Make this via external lookup table
         }
 
-        unsigned short int getListCount(linklistsizeint * ptr) const {
-            return *((unsigned short int *)ptr);
-        }
-
         void addPoint(const void *data_point, labeltype label) {
             addPoint(data_point, label, 0);
         }
 
-        tableint addPoint(const void *data_point, labeltype label, size_t level) {
+        /**
+         * Add new data point into vectors memory and label lookup
+         * 
+         */
+        tableint addPointData(const void *data_point, labeltype label) {
             tableint cur_c = 0;
             {
                 std::unique_lock <std::mutex> lock(cur_element_count_guard_);
@@ -777,6 +761,22 @@ namespace hnswlib {
                 label_lookup_[label] = cur_c;
             }
 
+            memset(data_level0_memory_ + cur_c * size_data_per_element_, 0, size_data_per_element_);
+
+            // Initialisation of the data and label
+            memcpy(getExternalLabeLp(cur_c), &label, sizeof(labeltype));
+            memcpy(getDataByInternalId(cur_c), data_point, data_size_);
+
+            return cur_c;
+        }
+
+        /**
+         * Link new point with other points in graph.
+         * 
+         */
+        void linkNewPoint(tableint cur_c, size_t level){
+            const void *data_point = getDataByInternalId(cur_c);
+
             std::unique_lock <std::mutex> lock_el(link_list_locks_[cur_c]);
             size_t curlevel = getRandomLevel(mult_);
             if (level > 0)
@@ -790,11 +790,6 @@ namespace hnswlib {
             tableint enterpoint_copy = enterpoint_node_;
 
 
-            memset(data_level0_memory_ + cur_c * size_data_per_element_, 0, size_data_per_element_);
-
-            // Initialisation of the data and label
-            memcpy(getExternalLabeLp(cur_c), &label, sizeof(labeltype));
-            memcpy(getDataByInternalId(cur_c), data_point, data_size_);
 
             if (curlevel) {
                 layers.setNumLayers(cur_c, curlevel);
@@ -812,7 +807,7 @@ namespace hnswlib {
                         while (changed) {
                             changed = false;
                             std::unique_lock <std::mutex> lock(link_list_locks_[currObj]);
-                            const linkcontainer *data = get_linklist(currObj, level);
+                            const linkcontainer *data = layers.getLinks(currObj, level);
 
                             for (tableint cand: *data) {
                                 if (cand < 0 || cand > max_elements_)
@@ -853,6 +848,11 @@ namespace hnswlib {
                 enterpoint_node_ = cur_c;
                 maxlevel_ = curlevel;
             }
+        }
+
+        tableint addPoint(const void *data_point, labeltype label, size_t level) {
+            tableint cur_c = addPointData(data_point, label);
+            linkNewPoint(cur_c, level);
             return cur_c;
         };
 
@@ -869,7 +869,7 @@ namespace hnswlib {
                 while (changed) {
                     changed = false;
                     size_t num_checked = 0;
-                    const linkcontainer *data = get_linklist(currObj, level);
+                    const linkcontainer *data = layers.getLinks(currObj, level);
                     for (tableint cand: *data) {
                         if (num_checked > maxSearchM_) {
                             break;
