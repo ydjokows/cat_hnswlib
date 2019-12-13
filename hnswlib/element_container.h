@@ -74,7 +74,6 @@ class ElementContainer : public ParamsContainer<Container>
 {
 public:
 
-
     void serialize(std::ostream &out)
     {
         for (size_t i = 0; i < this->_max_elements; i++)
@@ -96,6 +95,7 @@ public:
             auto *element_data = &this->data[i];
             size_t length = 0;
             readBinaryPOD(in, length);
+            element_data->reserve(length);
             for (size_t j = 0; j < length; j++)
             {
                 typename Container::value_type record = 0;

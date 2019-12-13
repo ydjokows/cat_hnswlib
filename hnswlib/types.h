@@ -8,7 +8,7 @@ typedef unsigned int tableint;
 typedef size_t labeltype;
 typedef size_t tagtype;
 
-typedef std::set<tagtype> tagcontainer;
+typedef std::unordered_set<tagtype> tagcontainer;
 
 typedef std::vector<tableint> linkcontainer;
 typedef std::vector<linkcontainer> layercontainer;
@@ -33,5 +33,30 @@ static void readBinaryPOD(std::istream &in, T &podRef)
 {
     in.read((char *)&podRef, sizeof(T));
 }
+
+template <typename T1, typename T2>
+static void writeMap(std::ostream &out, const std::unordered_map<T1, T2> &podRef)
+{   
+    writeBinaryPOD(out, podRef.size());
+    for(const auto &pair : podRef) {
+        writeBinaryPOD(out, pair.first);
+        writeBinaryPOD(out, pair.second);
+    }
+}
+
+template <typename T1, typename T2>
+static void readMap(std::istream &in, std::unordered_map<T1, T2> &podRef)
+{   
+    size_t size = 0;
+    readBinaryPOD(in, size);
+    for (size_t i = 0; i < size ; i++) {
+        T1 key;
+        T2 value;
+        readBinaryPOD(in, key);
+        readBinaryPOD(in, value);
+        podRef[key] = value;
+    }
+}
+
 
 } // namespace hnswlib

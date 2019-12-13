@@ -28,11 +28,12 @@ namespace hnswlib {
             loadIndex(location, s, max_elements);
         }
 
-        HierarchicalNSW(SpaceInterface<dist_t> *s, size_t max_elements, size_t M = 16, size_t ef_construction = 200, size_t random_seed = 100) :
+        HierarchicalNSW(SpaceInterface<dist_t> *s, size_t max_elements, size_t M = 16, size_t ef_construction = 200, size_t random_seed = 100, char *prefilled_data = nullptr) :
                 link_list_locks_(max_elements) {
             max_elements_ = max_elements;
 
             has_deletions_=false;
+            s_ = s;
             data_size_ = s->get_data_size();
             fstdistfunc_ = s->get_dist_func();
             dist_func_param_ = s->get_dist_func_param();
@@ -45,22 +46,28 @@ namespace hnswlib {
 
             ef_construction_ = std::max(ef_construction,M_);
             ef_ = 10;
-
+            random_seed_ = random_seed;
             level_generator_.seed(random_seed);
 
             size_data_per_element_ = data_size_ + sizeof(labeltype);
             label_offset_ = data_size_;
 
-            data_level0_memory_ = (char *) malloc(max_elements_ * size_data_per_element_);
-            if (data_level0_memory_ == nullptr)
-                throw std::runtime_error("Not enough memory");
-
+            if (prefilled_data == nullptr) 
+            {   
+                do_free = true;
+                data_level0_memory_ = (char *) malloc(max_elements_ * size_data_per_element_);
+                if (data_level0_memory_ == nullptr)
+                    throw std::runtime_error("Not enough memory");
+            } else {
+                do_free = false;
+                data_level0_memory_ = prefilled_data;
+            }
             cur_element_count = 0;
 
             visited_list_pool_ = new VisitedListPool(1, max_elements);
 
             tags.resize(max_elements_);
-            layer0.resize(max_elements_);
+            layer0.resize(max_elements_, maxM0_);
             layers.resize(max_elements_);
 
             //initializations for special treatment of the first node
@@ -69,7 +76,6 @@ namespace hnswlib {
 
             mult_ = 1 / log(1.0 * M_);
             revSize_ = 1.0 / mult_;
-            
         }
 
         struct CompareByFirst {
@@ -80,14 +86,20 @@ namespace hnswlib {
         };
 
         ~HierarchicalNSW() {
+            if (do_free)
+                free(data_level0_memory_);
             
-            free(data_level0_memory_);
             delete visited_list_pool_;
         }
+
+        SpaceInterface<dist_t> *s_;
 
         GraphLayer0 layer0;
         GraphLayers layers;
         TagsStore tags;
+
+        bool do_free;
+        size_t random_seed_;
 
         size_t max_elements_;
         size_t cur_element_count;
@@ -124,9 +136,9 @@ namespace hnswlib {
         void *dist_func_param_;
         std::unordered_map<labeltype, tableint> label_lookup_;
 
+        std::unordered_map<tagtype, tableint> tag_to_entrypoint_;
+
         std::default_random_engine level_generator_;
-
-
 
         inline labeltype getExternalLabel(tableint internal_id) const {
             labeltype return_label;
@@ -364,8 +376,6 @@ namespace hnswlib {
                 if (good) {
                     return_list.push_back(curent_pair);
                 }
-
-
             }
 
             for (std::pair<dist_t, tableint> curent_pair : return_list) {
@@ -424,8 +434,8 @@ namespace hnswlib {
 
                 size_t sz_link_list_other = ll_other->size();
 
-                if (sz_link_list_other > Mcurmax)
-                    throw std::runtime_error("Bad value of sz_link_list_other");
+                // if (sz_link_list_other > Mcurmax)
+                //     throw std::runtime_error("Bad value of sz_link_list_other");
                 if (selectedNeighbors[idx] == cur_c)
                     throw std::runtime_error("Trying to connect an element to itself");
                 if (level > get_node_level(selectedNeighbors[idx]))
@@ -441,7 +451,8 @@ namespace hnswlib {
                     std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> candidates;
                     candidates.emplace(d_max, cur_c);
 
-                    for (size_t j = 0; j < sz_link_list_other; j++) {
+                    // Allow to change only first Mcurmax links, others should be considered special
+                    for (size_t j = 0; j < std::min(sz_link_list_other, Mcurmax); j++) {
                         candidates.emplace(
                                 fstdistfunc_(getDataByInternalId(ll_other->at(j)), getDataByInternalId(selectedNeighbors[idx]),
                                              dist_func_param_), ll_other->at(j));
@@ -507,11 +518,13 @@ namespace hnswlib {
 
             writeBinaryPOD(output, maxM0_);
             writeBinaryPOD(output, M_);
+            writeBinaryPOD(output, random_seed_);
             // writeBinaryPOD(output, maxSearchM_);
             // writeBinaryPOD(output, maxSearchM0_);
             writeBinaryPOD(output, mult_);
             writeBinaryPOD(output, ef_construction_);
 
+            writeMap(output, tag_to_entrypoint_);
             tags.serialize(output);
             layer0.serialize(output);
             layers.serialize(output);
@@ -551,11 +564,13 @@ namespace hnswlib {
             readBinaryPOD(input, maxM_);
             readBinaryPOD(input, maxM0_);
             readBinaryPOD(input, M_);
+            readBinaryPOD(input, random_seed_);
             // readBinaryPOD(input, maxSearchM_);
             // readBinaryPOD(input, maxSearchM0_);
             readBinaryPOD(input, mult_);
             readBinaryPOD(input, ef_construction_);
 
+            readMap(input, tag_to_entrypoint_);
             tags.reset();
             tags.resize(max_elements_);
             tags.deserialize(input);
@@ -568,10 +583,15 @@ namespace hnswlib {
             layers.resize(max_elements_);
             layers.deserialize(input);
 
+            level_generator_.seed(random_seed_);
+
+            s_ = s;
+
             data_size_ = s->get_data_size();
             fstdistfunc_ = s->get_dist_func();
             dist_func_param_ = s->get_dist_func_param();
 
+            do_free = true;
             data_level0_memory_ = (char *) malloc(max_elements * size_data_per_element_);
             if (data_level0_memory_ == nullptr)
                 throw std::runtime_error("Not enough memory: loadIndex failed to allocate level0");
@@ -667,17 +687,46 @@ namespace hnswlib {
             }
 
             if (index) {
-                additinalIndex(ids);
+                if (tag_to_entrypoint_.find(tag) != tag_to_entrypoint_.end())
+                    throw std::runtime_error("Tag is already indexed! Sequential tag assignment is not supported.");
+                tableint tag_entrypoint = additinalIndex(ids);
+                tag_to_entrypoint_[tag] = tag_entrypoint;
             }
+        }
+
+        /**
+         * Remove all tag information as well as additional link, created for tags support.
+         * 
+         */
+        void resetTags() {
+            tags.reset();
+            tags.resize(max_elements_);
+            layer0.shrink(maxM0_);
+            layers.shrink(maxM_);
         }
 
         /**
          * Perform additional indexing over subset of points
          * 
          */
-        void additinalIndex(std::vector<tableint> &ids)
+        tableint additinalIndex(std::vector<tableint> &ids, size_t m = 0)
         {
-            std::cout << "additinalIndex " << ids.size() << std::endl;
+            // Create a new Index with same data, but empty links
+            if (m == 0) m = M_;
+
+            HierarchicalNSW *temp_hnsw = new HierarchicalNSW(s_, max_elements_, m, ef_construction_, random_seed_, data_level0_memory_);
+
+            for(tableint idx : ids)
+                temp_hnsw->linkNewPoint(idx, get_node_level(idx));
+            
+            layer0.mergeOther(temp_hnsw->layer0);
+            layers.mergeOther(temp_hnsw->layers);
+
+            tableint entrypoint = temp_hnsw->enterpoint_node_;
+
+            delete temp_hnsw;
+
+            return entrypoint;
         }
 
         /**
@@ -734,7 +783,8 @@ namespace hnswlib {
         }
 
         void addPoint(const void *data_point, labeltype label) {
-            addPoint(data_point, label, 0);
+            size_t level = getRandomLevel(mult_);
+            addPoint(data_point, label, level);
         }
 
         /**
@@ -774,25 +824,20 @@ namespace hnswlib {
          * Link new point with other points in graph.
          * 
          */
-        void linkNewPoint(tableint cur_c, size_t level){
+        void linkNewPoint(tableint cur_c, size_t curlevel){
             const void *data_point = getDataByInternalId(cur_c);
 
             std::unique_lock <std::mutex> lock_el(link_list_locks_[cur_c]);
-            size_t curlevel = getRandomLevel(mult_);
-            if (level > 0)
-                curlevel = level;
 
             std::unique_lock <std::mutex> templock(global);
             size_t maxlevelcopy = maxlevel_;
-            if (curlevel <= maxlevelcopy)
+            if (curlevel <= maxlevelcopy) // We need this lock only if new levels will be added
                 templock.unlock();
             tableint currObj = enterpoint_node_;
             tableint enterpoint_copy = enterpoint_node_;
 
-
-
             if (curlevel) {
-                layers.setNumLayers(cur_c, curlevel);
+                layers.setNumLayers(cur_c, curlevel, maxM_);
             }
 
             if ((signed)currObj != -1) {
