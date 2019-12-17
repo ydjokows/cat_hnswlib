@@ -40,9 +40,11 @@ class RandomSelfTestCase(unittest.TestCase):
 
         p.add_tags([1, 5, 100, 33], 8)
         p.add_tags([2, 5, 66, 17], 66)
+        p.add_tags(list(range(1,4000, 3)), 3)
 
         p.index_tagged(8)
         p.index_tagged(66)
+        p.index_tagged(3, m=4)
 
         check_exception = False
         try:

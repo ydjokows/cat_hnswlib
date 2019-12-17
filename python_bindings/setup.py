@@ -4,8 +4,7 @@ from setuptools.command.build_ext import build_ext
 import sys
 import setuptools
 
-__version__ = '0.3.4'
-
+__version__ = '0.4'
 
 source_files = ['bindings.cpp']
 
@@ -103,11 +102,11 @@ class BuildExt(build_ext):
 
 
 setup(
-    name='hnswlib',
+    name='cat_hnswlib',
     version=__version__,
-    description='hnswlib',
-    author='Yury Malkov and others',
-    url='https://github.com/yurymalkov/hnsw',
+    description='hnswlib with categorical filters',
+    author='Andrey Vasnetsov',
+    url='https://github.com/generall/hnswlib',
     long_description="""hnsw""",
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.0', 'numpy'],

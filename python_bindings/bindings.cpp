@@ -361,8 +361,8 @@ public:
         appr_alg->addTags(lables, tag);
     }
 
-    void indexTagged(size_t tag) {
-        appr_alg->indexTag(tag);
+    void indexTagged(size_t tag, size_t m = 0) {
+        appr_alg->indexTag(tag, m);
     }
 
     const hnswlib::tagcontainer getTags(size_t label) {
@@ -427,7 +427,7 @@ PYBIND11_PLUGIN(hnswlib) {
         .def("add_tags", &Index<float>::addTags, py::arg("labels"), py::arg("tag"))
         .def("get_tags", &Index<float>::getTags, py::arg("label"))
         .def("reset_tags", &Index<float>::resetTags)
-        .def("index_tagged", &Index<float>::indexTagged, py::arg("tag"))
+        .def("index_tagged", &Index<float>::indexTagged, py::arg("tag"), py::arg("m")=0)
         .def("get_current_count", &Index<float>::getCurrentCount)
         .def("__repr__",
         [](const Index<float> &a) {

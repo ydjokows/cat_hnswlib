@@ -683,7 +683,7 @@ namespace hnswlib {
             }
         }
 
-        void indexTag(tagtype tag) {
+        void indexTag(tagtype tag, size_t m = 0) {
             if (tag_to_entrypoint_.find(tag) != tag_to_entrypoint_.end())
                 throw std::runtime_error("Tag is already indexed! Sequential tag assignment is not supported.");
 
@@ -691,7 +691,7 @@ namespace hnswlib {
             if (tag_points == tags.tag_mapping.end())
                 throw std::runtime_error("No points with this tag found");
 
-            tableint tag_entrypoint = additinalIndex(tag_points->second);
+            tableint tag_entrypoint = additinalIndex(tag_points->second, m);
             tag_to_entrypoint_[tag] = tag_entrypoint;
         }
 
