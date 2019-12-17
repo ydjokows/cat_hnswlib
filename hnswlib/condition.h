@@ -51,9 +51,9 @@ public:
     /**
      * Should return list of possible categories where entry points could be found.
      */
-    std::vector<tagtype> entryCandidates() {
+    std::vector<tagtype> entryCandidates() const {
         std::vector<tagtype> candidates;
-        for(or_condition_t &or_condition: _conditions) {
+        for(const or_condition_t &or_condition: _conditions) {
             for(const negable_tag_t& negable_tag : or_condition) {
                 if (!negable_tag.first) {
                     candidates.push_back(negable_tag.second);

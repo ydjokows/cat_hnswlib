@@ -74,6 +74,11 @@ class ElementContainer : public ParamsContainer<Container>
 {
 public:
 
+    virtual void addElement(tableint idx, typename Container::value_type value) {
+        auto *element_data = &this->data[idx];
+        element_data->insert(element_data->end(), value);
+    }
+
     void serialize(std::ostream &out)
     {
         for (size_t i = 0; i < this->_max_elements; i++)
@@ -100,12 +105,10 @@ public:
             {
                 typename Container::value_type record = 0;
                 readBinaryPOD(in, record);
-                element_data->insert(element_data->end(), record);
+                addElement(i, record);
             }
         }
     }
-
-
 };
 
 } // namespace hnswlib

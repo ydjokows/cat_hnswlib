@@ -648,10 +648,6 @@ namespace hnswlib {
             return search->second;
         }
 
-        void setTagsByLabel(labeltype label, hnswlib::tagcontainer &new_element_tags) {
-            tags.setTags(getInterenalIdByLabel(label), new_element_tags);
-        }
-
         /**
          * Assigns tag to the datapoint
          * @param label
@@ -901,12 +897,42 @@ namespace hnswlib {
             return cur_c;
         };
 
+        tableint getConditionedEntrypoint(const SearchCondition &condition) const
+        {
+            if (tags.checkCondition(enterpoint_node_, condition))
+            {
+                return enterpoint_node_;
+            }
+
+            auto candidates = condition.entryCandidates();
+
+            for (tagtype tag : candidates)
+            {
+                tableint tag_entry = tag_to_entrypoint_.at(tag);
+                if (tags.checkCondition(enterpoint_node_, condition))
+                    return tag_entry;
+            }
+
+            for (tagtype tag : candidates)
+            {
+                const std::vector<tableint> *tag_nodes = &(tags.tag_mapping.at(tag));
+                for (tableint idx : *tag_nodes)
+                    if (tags.checkCondition(enterpoint_node_, condition))
+                        return idx;
+            }
+
+            return 0;
+        }
+
         std::priority_queue<std::pair<dist_t, labeltype >>
         searchKnn(const void *query_data, size_t k, SearchCondition &condition) const {
             std::priority_queue<std::pair<dist_t, labeltype >> result;
             if (cur_element_count == 0) return result;
 
-            tableint currObj = enterpoint_node_;
+            tableint currObj = getConditionedEntrypoint(condition);
+
+            if (!tags.checkCondition(currObj, condition)) return result;
+
             dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
 
             for (size_t level = maxlevel_; level > 0; level--) {

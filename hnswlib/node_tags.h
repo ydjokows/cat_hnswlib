@@ -13,21 +13,26 @@ namespace hnswlib {
     class TagsStore : public ElementContainer<tagcontainer> {
     public:
 
+        std::unordered_map<tagtype, std::vector<tableint> > tag_mapping;
+
         tagcontainer *getTags(tableint idx) {
             return &data[idx];
         }
 
-        void addTag(tableint id, tagtype tag) {
-            tagcontainer *element_tags = &data[id];
-            element_tags->insert(element_tags->end(), tag);
+        void reset()
+        {
+            _max_elements = 0;
+            data.clear();
+            tag_mapping.clear();
         }
 
-        void setTags(tableint id, tagcontainer &new_element_tags) {
-            tagcontainer *element_tags = &data[id];
-            element_tags->clear();
-            for(auto &tag: new_element_tags) {
-                element_tags->insert(element_tags->end(), tag);
-            }
+        virtual void addElement(tableint idx, tagtype value) {
+            ElementContainer::addElement(idx, value);
+            tag_mapping[value].push_back(idx);
+        }
+
+        void addTag(tableint idx, tagtype tag) {
+            addElement(idx, tag);
         }
 
         bool checkCondition(tableint id, const SearchCondition &condition) const {

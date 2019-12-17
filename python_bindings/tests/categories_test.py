@@ -68,8 +68,12 @@ class RandomSelfTestCase(unittest.TestCase):
 
         self.assertIn(18, p.get_tags(6015))
         self.assertIn(18, p.get_tags(6015))
+        
+        p.reset_tags()
 
-        p.set_tags(5, {1,2,3})
+        p.add_tags([5], 1)
+        p.add_tags([5], 2)
+        p.add_tags([5], 3)
 
         self.assertIn(2, p.get_tags(5))
         self.assertNotIn(66, p.get_tags(5))

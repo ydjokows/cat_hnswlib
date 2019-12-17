@@ -6,6 +6,7 @@
 #include <string.h>
 #include <vector>
 #include <set>
+#include <unordered_map>
 
 namespace hnswlib
 {
