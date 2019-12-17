@@ -673,7 +673,7 @@ namespace hnswlib {
          * @param tag
          * @param index do additional indexing inside category?
          */
-        void addTags(std::vector<labeltype> &lables, const tagtype tag, const bool index = false)
+        void addTags(std::vector<labeltype> &lables, const tagtype tag)
         {
             std::vector<tableint> ids = std::vector<tableint>();
             for (labeltype label : lables) {
@@ -681,14 +681,20 @@ namespace hnswlib {
                 ids.push_back(point_id);
                 tags.addTag(point_id, tag);
             }
-
-            if (index) {
-                if (tag_to_entrypoint_.find(tag) != tag_to_entrypoint_.end())
-                    throw std::runtime_error("Tag is already indexed! Sequential tag assignment is not supported.");
-                tableint tag_entrypoint = additinalIndex(ids);
-                tag_to_entrypoint_[tag] = tag_entrypoint;
-            }
         }
+
+        void indexTag(tagtype tag) {
+            if (tag_to_entrypoint_.find(tag) != tag_to_entrypoint_.end())
+                throw std::runtime_error("Tag is already indexed! Sequential tag assignment is not supported.");
+
+            auto tag_points = tags.tag_mapping.find(tag);
+            if (tag_points == tags.tag_mapping.end())
+                throw std::runtime_error("No points with this tag found");
+
+            tableint tag_entrypoint = additinalIndex(tag_points->second);
+            tag_to_entrypoint_[tag] = tag_entrypoint;
+        }
+
 
         /**
          * Remove all tag information as well as additional link, created for tags support.
@@ -908,19 +914,21 @@ namespace hnswlib {
 
             for (tagtype tag : candidates)
             {
-                tableint tag_entry = tag_to_entrypoint_.at(tag);
-                if (tags.checkCondition(enterpoint_node_, condition))
-                    return tag_entry;
+                auto tag_search = tag_to_entrypoint_.find(tag);
+                if (tag_search != tag_to_entrypoint_.end()) {
+                    tableint tag_entry = tag_search->second;
+                    if (tags.checkCondition(tag_entry, condition))
+                        return tag_entry;
+                }
             }
 
             for (tagtype tag : candidates)
             {
                 const std::vector<tableint> *tag_nodes = &(tags.tag_mapping.at(tag));
                 for (tableint idx : *tag_nodes)
-                    if (tags.checkCondition(enterpoint_node_, condition))
+                    if (tags.checkCondition(idx, condition))
                         return idx;
             }
-
             return 0;
         }
 
@@ -931,7 +939,7 @@ namespace hnswlib {
 
             tableint currObj = getConditionedEntrypoint(condition);
 
-            if (!tags.checkCondition(currObj, condition)) return result;
+            if (!tags.checkCondition(currObj, condition)) return result; //happens if nothing fits the condition.
 
             dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
 

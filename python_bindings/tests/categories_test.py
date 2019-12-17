@@ -41,6 +41,18 @@ class RandomSelfTestCase(unittest.TestCase):
         p.add_tags([1, 5, 100, 33], 8)
         p.add_tags([2, 5, 66, 17], 66)
 
+        p.index_tagged(8)
+        p.index_tagged(66)
+
+        check_exception = False
+        try:
+            p.index_tagged(100)
+        except RuntimeError as e:
+            print('Correct exception:', e)
+            check_exception = True
+        
+        self.assertTrue(check_exception, 'had not throw an exception')
+
         # Query the elements for themselves and measure recall:
         labels, _ = p.knn_query(data1, k=1)
         self.assertAlmostEqual(np.mean(labels.reshape(-1) == np.arange(len(data1))),1.0,3)

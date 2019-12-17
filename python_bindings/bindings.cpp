@@ -358,7 +358,11 @@ public:
     }
 
     void addTags(std::vector<size_t> &lables, size_t tag) {
-        appr_alg->addTags(lables, tag, true);
+        appr_alg->addTags(lables, tag);
+    }
+
+    void indexTagged(size_t tag) {
+        appr_alg->indexTag(tag);
     }
 
     const hnswlib::tagcontainer getTags(size_t label) {
@@ -423,6 +427,7 @@ PYBIND11_PLUGIN(hnswlib) {
         .def("add_tags", &Index<float>::addTags, py::arg("labels"), py::arg("tag"))
         .def("get_tags", &Index<float>::getTags, py::arg("label"))
         .def("reset_tags", &Index<float>::resetTags)
+        .def("index_tagged", &Index<float>::indexTagged, py::arg("tag"))
         .def("get_current_count", &Index<float>::getCurrentCount)
         .def("__repr__",
         [](const Index<float> &a) {
