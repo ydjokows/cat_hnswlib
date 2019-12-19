@@ -69,7 +69,6 @@ class ConditionalSeachTestCase(unittest.TestCase):
             true_closest = get_closest_brut(target, points, mask)
             found, _ = hnsw.knn_query(target, k=10, conditions=condition)
             top_found = get_top_fount(true_closest, found[0])
-
             top_hit = top_found[0]
             top_hits.append(top_hit)
         
