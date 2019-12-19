@@ -384,7 +384,7 @@ namespace hnswlib {
             }
         }
 
-        size_t get_node_level(tableint internal_id) {
+        size_t get_node_level(tableint internal_id) const {
             return layers.getData(internal_id)->size();
         }
 
@@ -854,9 +854,9 @@ namespace hnswlib {
                         while (changed) {
                             changed = false;
                             std::unique_lock <std::mutex> lock(link_list_locks_[currObj]);
-                            const linkcontainer *data = layers.getLinks(currObj, level);
+                            const linkcontainer *links = layers.getLinks(currObj, level);
 
-                            for (tableint cand: *data) {
+                            for (tableint cand: *links) {
                                 if (cand < 0 || cand > max_elements_)
                                     throw std::runtime_error("cand error");
                                 dist_t d = fstdistfunc_(data_point, getDataByInternalId(cand), dist_func_param_);
@@ -885,7 +885,7 @@ namespace hnswlib {
                 }
             } else {
                 // Do nothing for the first element
-                enterpoint_node_ = 0;
+                enterpoint_node_ = cur_c;
                 maxlevel_ = curlevel;
 
             }
@@ -943,7 +943,9 @@ namespace hnswlib {
 
             dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
 
-            for (size_t level = maxlevel_; level > 0; level--) {
+            size_t entry_level = get_node_level(currObj);
+
+            for (size_t level = entry_level; level > 0; level--) {
                 bool changed = true;
                 while (changed) {
                     changed = false;
