@@ -1,5 +1,4 @@
-# cat_hnswlib - Fork of the [Hnswlib](https://github.com/nmslib/hnswlib) with support of categorical filtering.
-
+# Hnswlib - fast approximate nearest neighbor search
 Header-only C++ HNSW implementation with python bindings. Paper code for the HNSW 200M SIFT experiment
 
 **NEWS:**
@@ -72,14 +71,8 @@ Index methods:
 
 * `get_current_count()` - returns the current number of element stored in the index
 
------
-New categorical methods:
-
-* `add_tags(labels, tag)` - assign `tag` to the specified `labels`
-* `get_tags(label)` - returns list of tags, assigned to the `label`
-* `reset_tags()` - drop all tag-related information including additionaly built links
-* `index_tagged(tag, m)` - build additional navigation graph among tagged points with `tag`. Ensure connectiviti of conditional search
-* `knn_query(data, k = 1, num_threads = -1,  conditions = [])` - extended with parameret `conditions`. It defines what points to include in search results. Performs traversal starting from the first point which fulfills condition. Example `(A | !B) & C` is represented as  `[[(0, A), (1, B)], [(0, C)]]`, where A, B, C loginal clauses if respective tag is assigned to a point. `[[(0, 55)]]` - means find closest point with tag 55.
+   
+        
         
   
 #### Python bindings examples
