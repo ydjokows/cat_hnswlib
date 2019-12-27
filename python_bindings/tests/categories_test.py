@@ -57,6 +57,7 @@ class RandomSelfTestCase(unittest.TestCase):
 
         # Query the elements for themselves and measure recall:
         labels, _ = p.knn_query(data1, k=1)
+        labels = np.array(labels)
         self.assertAlmostEqual(np.mean(labels.reshape(-1) == np.arange(len(data1))),1.0,3)
 
         # Serializing and deleting the index:
@@ -94,7 +95,7 @@ class RandomSelfTestCase(unittest.TestCase):
 
         # Query the elements for themselves and measure recall:
         labels, _ = p.knn_query(data, k=1)
-
+        labels = np.array(labels)
         self.assertAlmostEqual(np.mean(labels.reshape(-1) == np.arange(len(data))),1.0,3)
 
 

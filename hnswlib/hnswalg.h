@@ -711,7 +711,7 @@ namespace hnswlib {
          * Perform additional indexing over subset of points
          * 
          */
-        tableint additinalIndex(std::vector<tableint> &ids, size_t m = 0)
+        tableint additinalIndex(std::set<tableint> &ids, size_t m = 0)
         {
             // Create a new Index with same data, but empty links
             if (m == 0) m = M_;
@@ -737,8 +737,8 @@ namespace hnswlib {
          */
         void additinalIndexByLables(std::vector<labeltype> &labels)
         {
-            std::vector<tableint> ids = std::vector<tableint>();
-            std::transform(labels.begin(), labels.end(), std::back_inserter(ids), getInterenalIdByLabel);
+            std::set<tableint> ids = std::set<tableint>();
+            std::transform(labels.begin(), labels.end(), std::inserter(ids, ids.begin()), getInterenalIdByLabel);
             additinalIndex(ids);
         }
 
@@ -924,7 +924,7 @@ namespace hnswlib {
 
             for (tagtype tag : candidates)
             {
-                const std::vector<tableint> *tag_nodes = &(tags.tag_mapping.at(tag));
+                const std::set<tableint> *tag_nodes = &(tags.tag_mapping.at(tag));
                 for (tableint idx : *tag_nodes)
                     if (tags.checkCondition(idx, condition))
                         return idx;

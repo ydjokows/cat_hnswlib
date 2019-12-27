@@ -13,7 +13,7 @@ namespace hnswlib {
     class TagsStore : public ElementContainer<tagcontainer> {
     public:
 
-        std::unordered_map<tagtype, std::vector<tableint> > tag_mapping;
+        std::unordered_map<tagtype, std::set<tableint> > tag_mapping;
 
         tagcontainer *getTags(tableint idx) {
             return &data[idx];
@@ -28,7 +28,7 @@ namespace hnswlib {
 
         virtual void addElement(tableint idx, tagtype value) {
             ElementContainer::addElement(idx, value);
-            tag_mapping[value].push_back(idx);
+            tag_mapping[value].insert(idx);
         }
 
         void addTag(tableint idx, tagtype tag) {
