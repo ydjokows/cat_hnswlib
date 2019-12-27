@@ -15,7 +15,10 @@ New categorical methods:
 
 ```python
 import hnswlib
-from collection import defaultdict
+import numpy as np
+from collections import defaultdict
+import tqdm
+
 
 dim = 50
 elements = 10_000
@@ -24,6 +27,7 @@ parts_count = 100
 hnsw = hnswlib.Index(space='cosine', dim=dim)
 hnsw.init_index(max_elements = elements, ef_construction = 10, M = 16, random_seed=45)
 
+points = np.random.rand(elements, dim)
 hnsw.add_items(points)
 
 
