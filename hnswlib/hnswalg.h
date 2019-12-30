@@ -952,6 +952,7 @@ namespace hnswlib {
 
             for (tagtype tag : candidates)
             {
+                if (tag_to_entrypoint_.find(tag) == tag_to_entrypoint_.end()) continue;
                 const std::set<tableint> *tag_nodes = &(tags.tag_mapping.at(tag));
                 for (tableint idx : *tag_nodes)
                     if (tags.checkCondition(idx, condition))

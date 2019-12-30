@@ -20,14 +20,17 @@ def get_closest_brut(target, data, mask):
     closest = list(np.argsort(true_distance))
     return closest
 
-def get_constraints(num_elements, parts_count, part_id):
-    mask = np.arange(0, num_elements) % parts_count == part_id
+def get_constraints(num_elements, parts_count, part_ids):
+
+    mask = np.zeros(num_elements)
+    for part_id in part_ids:
+        mask = np.logical_or(mask, np.arange(0, num_elements) % parts_count == part_id)
 
     tags = defaultdict(list)
     for i in range(num_elements):
         tags[i % parts_count].append(i)
 
-    condition = [[(False, part_id)]]
+    condition = [[(False, part_id) for part_id in part_ids]]
 
     return tags, mask, condition
 
@@ -43,6 +46,32 @@ def get_top_fount(true_labels, found_labels):
 
 class ConditionalSeachTestCase(unittest.TestCase):
 
+    def test_complex_condition(self):
+        import hnswlib        
+        dim = 50
+        elements = 10_000
+
+        hnsw = hnswlib.Index(space='cosine', dim=dim)
+        hnsw.init_index(max_elements = elements, ef_construction = 10, M = 16, random_seed=45)
+        hnsw.set_num_threads(1)
+
+        tags, mask, condition = get_constraints(elements, 100, [66, 45, 21, 55, 12, 99, 0, 4, 83])
+        points = np.random.rand(elements, dim)
+        hnsw.add_items(points)
+        for tag, ids in tqdm.tqdm(tags.items()):
+            hnsw.add_tags(ids, tag)
+            hnsw.index_tagged(tag)
+        
+        hnsw.save_index('tmp_index.hnsw')
+
+        hnsw2 = hnswlib.Index(space='cosine', dim=dim)
+        hnsw2.load_index('tmp_index.hnsw')
+        
+        target = get_random_vector(dim)
+
+        found, _ = hnsw2.knn_query(target, k=10, conditions=condition)
+
+
     def test_random_subsample(self):
         import hnswlib        
         dim = 50
@@ -51,7 +80,7 @@ class ConditionalSeachTestCase(unittest.TestCase):
 
         points = np.random.rand(elements, dim)
 
-        tags, mask, condition = get_constraints(elements, 100, 66)
+        tags, mask, condition = get_constraints(elements, 100, [66])
 
         hnsw = hnswlib.Index(space='cosine', dim=dim)
         hnsw.init_index(max_elements = elements, ef_construction = 10, M = 16, random_seed=45)
