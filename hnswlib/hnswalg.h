@@ -697,6 +697,35 @@ namespace hnswlib {
 
 
         /**
+         * Creates additional links between given tags.
+         * Should ensure connectivity.
+         */
+        void indexTags(std::vector<tagtype> &indexing_tags, size_t m = 0) {
+            if (m == 0) m = M_;
+
+            HierarchicalNSW *temp_hnsw = new HierarchicalNSW(s_, max_elements_, m, ef_construction_, random_seed_, data_level0_memory_);
+
+            std::unordered_set<tableint> indexed_points;
+            for(tagtype tag : indexing_tags) {
+                auto tag_points = tags.tag_mapping.find(tag);
+                if (tag_points == tags.tag_mapping.end())
+                    throw std::runtime_error("No points with tag " + std::to_string(tag) + " found");
+
+                for(tableint idx : tag_points->second){
+                    if( indexed_points.find(idx) != indexed_points.end()){
+                        indexed_points.insert(idx);
+                        temp_hnsw->linkNewPoint(idx, get_node_level(idx));
+                    }
+                }
+            }
+
+            layer0.mergeOther(temp_hnsw->layer0);
+            layers.mergeOther(temp_hnsw->layers);
+
+            delete temp_hnsw;
+        }
+
+        /**
          * Remove all tag information as well as additional link, created for tags support.
          * 
          */
@@ -706,7 +735,6 @@ namespace hnswlib {
             layer0.shrink(maxM0_);
             layers.shrink(maxM_);
         }
-
         /**
          * Perform additional indexing over subset of points
          * 

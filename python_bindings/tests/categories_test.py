@@ -45,6 +45,7 @@ class RandomSelfTestCase(unittest.TestCase):
         p.index_tagged(8)
         p.index_tagged(66)
         p.index_tagged(3, m=4)
+        p.index_cross_tagged([8, 66])
 
         check_exception = False
         try:

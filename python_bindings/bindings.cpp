@@ -352,6 +352,10 @@ public:
         appr_alg->indexTag(tag, m);
     }
 
+    void indexCrossTagged(std::vector<size_t> &tags, size_t m = 0) {
+        appr_alg->indexTags(tags, m);
+    }
+
     const hnswlib::tagcontainer getTags(size_t label) {
         return *appr_alg->getTagsByLabel(label);
     }
@@ -415,6 +419,7 @@ PYBIND11_PLUGIN(hnswlib) {
         .def("get_tags", &Index<float>::getTags, py::arg("label"))
         .def("reset_tags", &Index<float>::resetTags)
         .def("index_tagged", &Index<float>::indexTagged, py::arg("tag"), py::arg("m")=0)
+        .def("index_cross_tagged", &Index<float>::indexCrossTagged, py::arg("tags"), py::arg("m")=0)
         .def("get_current_count", &Index<float>::getCurrentCount)
         .def("__repr__",
         [](const Index<float> &a) {
