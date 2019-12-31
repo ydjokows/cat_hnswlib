@@ -655,7 +655,20 @@ namespace hnswlib {
          */
         void addTagByLabel(labeltype label, tagtype tag)
         {   
-            tags.addTag(getInterenalIdByLabel(label), tag);
+            addTagByIdx(getInterenalIdByLabel(label), tag);
+        }
+
+        void addTagByIdx(tableint idx, tagtype tag)
+        {
+            if (tag_to_entrypoint_.find(tag) == tag_to_entrypoint_.end()){
+                tag_to_entrypoint_[tag] = idx;
+            }else{
+                size_t currect_level = get_node_level(tag_to_entrypoint_[tag]);
+                size_t new_level = get_node_level(idx);
+                if (new_level > currect_level) 
+                    tag_to_entrypoint_[tag] = idx;
+            }
+            tags.addTag(idx, tag);
         }
 
         /**
@@ -679,14 +692,11 @@ namespace hnswlib {
             for (labeltype label : lables) {
                 tableint point_id = getInterenalIdByLabel(label);
                 ids.push_back(point_id);
-                tags.addTag(point_id, tag);
+                addTagByIdx(point_id, tag);
             }
         }
 
         void indexTag(tagtype tag, size_t m = 0) {
-            if (tag_to_entrypoint_.find(tag) != tag_to_entrypoint_.end())
-                throw std::runtime_error("Tag is already indexed! Sequential tag assignment is not supported.");
-
             auto tag_points = tags.tag_mapping.find(tag);
             if (tag_points == tags.tag_mapping.end())
                 throw std::runtime_error("No points with this tag found");
