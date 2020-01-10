@@ -173,6 +173,8 @@ print("Recall for two batches:", np.mean(labels.reshape(-1) == np.arange(len(dat
 
 ### Bindings installation
 
+Warning: minimal required gcc version is 5.4.0
+
 You can install from sources:
 ```bash
 apt-get install -y python-setuptools python-pip

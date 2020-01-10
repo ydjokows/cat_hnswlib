@@ -47,3 +47,11 @@ condition = [[(False, 66)]]
 # Result will only include points with id % 66 == 0
 found_labels, found_dist = hnsw.knn_query(target, k=10, conditions=condition)
 ```
+
+# ToDo
+
+* Query planner
+  * decide on search strategy depending on the amount of data-points covered by given condition
+    * If number of points is small - use full scan
+    * If there is large categories - search in them with graph
+    * if there is a large number of small or-conditioned categories - search independently and parallel
