@@ -688,10 +688,8 @@ namespace hnswlib {
          */
         void addTags(std::vector<labeltype> &lables, const tagtype tag)
         {
-            std::vector<tableint> ids = std::vector<tableint>();
             for (labeltype label : lables) {
                 tableint point_id = getInterenalIdByLabel(label);
-                ids.push_back(point_id);
                 addTagByIdx(point_id, tag);
             }
         }

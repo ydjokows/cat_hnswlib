@@ -1,2 +1,4 @@
 statsmodels
 tqdm
+python-geohash
+
