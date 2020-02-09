@@ -12,6 +12,12 @@ New categorical methods:
 * `knn_query(data, k = 1, num_threads = -1,  conditions = [])` - extended with parameret `conditions`. It defines what points to include in search results. Performs traversal starting from the first point which fulfills condition. Example `(A | !B) & C` is represented as  `[[(0, A), (1, B)], [(0, C)]]`, where A, B, C loginal clauses if respective tag is assigned to a point. `[[(0, 55)]]` - means find closest point with tag 55.
 
 
+## Install
+
+```
+pip install 'git+https://github.com/generall/cat_hnswlib.git#&subdirectory=python_bindings' 
+```
+
 ## Example
 
 ```python
