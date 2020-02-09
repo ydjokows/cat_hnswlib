@@ -15,7 +15,7 @@ New categorical methods:
 ## Install
 
 ```
-pip install 'git+https://github.com/generall/cat_hnswlib.git#&subdirectory=python_bindings' 
+pip install --no-binary :all: 'git+https://github.com/generall/cat_hnswlib.git#subdirectory=python_bindings' 
 ```
 
 ## Example
