@@ -1,17 +1,15 @@
 
-### Method to change is this one in the 
-
-  .knn_query_new( vects, k = topk, conditions = filters   )
-
-    and move the python INSIDE the C++ code.
+#################### Goal
+    move the python Loop  INSIDE the C++ code binding.cpp  code
    
 
   
-  
-binding.cpp  : add new method:
-    
-    
 
+  
+#########  
+binding.cpp  : add new method:    knn_query_new
+    
+    
   PYBIND11_PLUGIN(hnswlib) {
         py::module m("hnswlib");
   
@@ -83,11 +81,10 @@ binding.cpp  : add new method:
           return idxall 
         
         
+
+                             
         
-        
-##########################################        
-##########################################        
-##########################################                
+#################################################################################### ##########################################                 
     #### New Python version      
         
     def hnsw_useremb_get_topk(vecti="2330.324,0.34234,0.2324", genreid=[2323,232,3232], topk=100, dimvect=512, filter_cond='must'):
