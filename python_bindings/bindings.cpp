@@ -76,6 +76,7 @@ class Index {
 public:
     Index(const std::string &space_name, const int dim) :
             space_name(space_name), dim(dim) {
+        std::cerr<<"my hnswlib dev module"<<std::endl;
         normalize=false;
         if(space_name=="l2") {
             l2space = new hnswlib::L2Space(dim);
@@ -158,12 +159,12 @@ public:
             features = buffer.shape[0];
         }
 
-        if (features != dim)
+        if ((int)features != dim)
             throw std::runtime_error("wrong dimensionality of the vectors");
 
         // avoid using threads when the number of searches is small:
 
-        if(rows<=num_threads*4){
+        if((int)rows<=num_threads*4){
             num_threads=1;
         }
 
@@ -172,7 +173,7 @@ public:
         if (!ids_.is_none()) {
             py::array_t < size_t, py::array::c_style | py::array::forcecast > items(ids_);
             auto ids_numpy = items.request();
-            if(ids_numpy.ndim==1 && ids_numpy.shape[0]==rows) {
+            if(ids_numpy.ndim==1 && ids_numpy.shape[0]==(int)rows) {
                 std::vector<size_t> ids1(ids_numpy.shape[0]);
                 for (size_t i = 0; i < ids1.size(); i++) {
                     ids1[i] = items.data()[i];
@@ -254,6 +255,73 @@ public:
         return ids;
     }
 
+    py::object knnQuery_return_numpy_new(py::object input, size_t k = 1, int num_threads = -1, std::vector<hnswlib::condition_t> &conditions = {}) {
+
+        py::array_t < dist_t, py::array::c_style | py::array::forcecast > items(input);
+        auto buffer = items.request();
+
+        std::vector<std::vector<hnswlib::labeltype>> data_numpy_l;
+        std::vector<std::vector<dist_t>> data_numpy_d;
+
+        //size_t features, rows;
+
+        if (num_threads <= 0)
+            num_threads = num_threads_default;
+
+        {
+            py::gil_scoped_release l;
+
+            //rows = 1;
+            //features = buffer.shape[0];
+
+            if((int)conditions.size()<=num_threads*4){
+                num_threads=1;
+            }
+
+            data_numpy_l.resize(conditions.size());
+            data_numpy_d.resize(conditions.size());
+
+            if(normalize==false) {
+                ParallelFor(0, conditions.size(), num_threads, [&](size_t ncondition, size_t threadId) {
+                        hnswlib::SearchCondition search_condition = hnswlib::SearchCondition(conditions[ncondition]);
+                        std::priority_queue<std::pair<dist_t, hnswlib::labeltype >> result = appr_alg->searchKnn(
+                                (void *) items.data(0), k, search_condition);
+                        while(!result.empty()){
+                            auto result_tuple = result.top();
+                            data_numpy_d.at(ncondition).push_back(result_tuple.first);
+                            data_numpy_l.at(ncondition).push_back(result_tuple.second);
+                            result.pop();
+                        }
+                        std::reverse(data_numpy_d.at(ncondition).begin(),data_numpy_d.at(ncondition).end());
+                        std::reverse(data_numpy_l.at(ncondition).begin(),data_numpy_l.at(ncondition).end());
+                    }
+                );
+            }
+            else{
+                std::vector<float> norm_array(num_threads);
+                normalize_vector((float *) items.data(0), (norm_array.data()));
+                ParallelFor(0, conditions.size(), num_threads, [&](size_t ncondition, size_t threadId) {
+                        //float *data= (float *) items.data(row);
+                        hnswlib::SearchCondition search_condition = hnswlib::SearchCondition(conditions[ncondition]);
+
+                        std::priority_queue<std::pair<dist_t, hnswlib::labeltype >> result = appr_alg->searchKnn(
+                                (void *) (norm_array.data()), k, search_condition);
+                        while(!result.empty()){
+                            auto result_tuple = result.top();
+                            data_numpy_d.at(ncondition).push_back(result_tuple.first);
+                            data_numpy_l.at(ncondition).push_back(result_tuple.second);
+                            result.pop();
+                        }
+                        std::reverse(data_numpy_d.at(ncondition).begin(),data_numpy_d.at(ncondition).end());
+                        std::reverse(data_numpy_l.at(ncondition).begin(),data_numpy_l.at(ncondition).end());
+                    }
+                );
+            }
+
+        }
+        return py::make_tuple(data_numpy_l, data_numpy_d);
+    }
+
     py::object knnQuery_return_numpy(py::object input, size_t k = 1, int num_threads = -1, hnswlib::condition_t &conditions = {}) {
 
         py::array_t < dist_t, py::array::c_style | py::array::forcecast > items(input);
@@ -287,7 +355,7 @@ public:
 
             // avoid using threads when the number of searches is small:
 
-            if(rows<=num_threads*4){
+            if((int)rows<=num_threads*4){
                 num_threads=1;
             }
 
@@ -316,7 +384,7 @@ public:
             else{
                 std::vector<float> norm_array(num_threads*features);
                 ParallelFor(0, rows, num_threads, [&](size_t row, size_t threadId) {
-                        float *data= (float *) items.data(row);
+                        //float *data= (float *) items.data(row);
 
                         size_t start_idx = threadId * dim;
                         normalize_vector((float *) items.data(row), (norm_array.data()+start_idx));
@@ -395,14 +463,16 @@ public:
     }
 };
 
-PYBIND11_PLUGIN(hnswlib) {
-        py::module m("hnswlib");
+//PYBIND11_PLUGIN(hnswlib) {
+PYBIND11_MODULE(hnswlib, m) {
+        //py::module m("hnswlib");
 
         py::class_<Index<float>>(m, "Index")
         .def(py::init<const std::string &, const int>(), py::arg("space"), py::arg("dim"))
         .def("init_index", &Index<float>::init_new_index, py::arg("max_elements"), py::arg("M")=16,
         py::arg("ef_construction")=200, py::arg("random_seed")=100)
         .def("knn_query", &Index<float>::knnQuery_return_numpy, py::arg("data"), py::arg("k")=1, py::arg("num_threads")=-1, py::arg("conditions")=std::vector<std::vector< hnswlib::tagtype >>())
+        .def("knn_query_new", &Index<float>::knnQuery_return_numpy_new, py::arg("data"), py::arg("k")=1, py::arg("num_threads")=-1, py::arg("conditions")=std::vector<std::vector<std::vector< hnswlib::tagtype >>>())
         .def("add_items", &Index<float>::addItems, py::arg("data"), py::arg("ids") = py::none(), py::arg("num_threads")=-1)
         .def("get_items", &Index<float, float>::getDataReturnList, py::arg("ids") = py::none())
         .def("get_ids_list", &Index<float>::getIdsList)
@@ -426,5 +496,6 @@ PYBIND11_PLUGIN(hnswlib) {
             return "<HNSW-lib index>";
         }
         );
-        return m.ptr();
+        //return m.ptr();
 }
+
